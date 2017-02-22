@@ -52,6 +52,10 @@ class Recipient:
     self.email_1_date = self.__getCustomField('email_1_date')
     self.email_2_date = self.__getCustomField('email_2_date')
     self.email_3_date = self.__getCustomField('email_3_date')
+    self.email_4_date = self.__getCustomField('email_4_date')
+    self.email_5_date = self.__getCustomField('email_5_date')
+    self.email_6_date = self.__getCustomField('email_6_date')
+    self.email_7_date = self.__getCustomField('email_7_date')
 
   def __getCustomField(self, field_name):
     for field in self.custom_fields:
@@ -71,6 +75,7 @@ class Recipient:
     except urllib.HTTPError as e:
         print e.read()
         exit()
+
 
 class DripCampaign:
   def __init__(self, email_series, list_id):
@@ -106,7 +111,7 @@ class DripCampaign:
 
   # Add recipient to list to receive drips
   # POST https://api.sendgrid.com/v3/contactdb/lists/{list_id}/recipients/{recipient_id}
-  def addRecipient(self):
+  # def addRecipient(self):
     # TO DO - CREATE RECIPIENT AND ADD TO LIST
 
 
