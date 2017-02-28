@@ -29,7 +29,7 @@ class DripCampaign:
     list_recipients = body['recipients']
     
     # Create a list of Recipients from the given contacts list
-    self.recipients = [];
+    self.recipients = []
     for recipient_attributes in list_recipients:
       recipient = DripRecipient(recipient_attributes, self.email_series)
       self.recipients.append(recipient)
@@ -54,19 +54,50 @@ class DripCampaign:
             recipient.sendEmail(email['subject'], email['content'], email['template_id'])
 
   # Add recipient to list to receive drips
-  def addRecipientToDrip(self, email):
+  def addExistingContactToDrip(self, email):
     contact = Contact(email)
-    contact.addContactToList(self.list_id)
-    date_fields = [{}]
-    for email in email_series:
-      date_fields[0][email['field']] = self.__get_send_date(email['sent_at_day'])
-    contact.addFieldsToContact(date_fields)
+    addedToList = contact.addContactToList(self.list_id)
+    if addedToList == True:
+      date_fields = [{}]
+      for email in self.email_series:
+        date_fields[0][email['field']] = self.__get_send_date(email['sent_at_day'])
+      contact.addFieldsToContact(date_fields)
+    elif (addedToList == 'DNE'):
+      print 'Contact does not exist. You can create contact and add to drip with addNewContactToDrip method'
+    else:
+      print 'Contact is already on drip list.  Update contact with updateContactDateFields method'
+
+  def addNewContactToDrip(self, email, first_name="", last_name=""):
+    contact = Contact(email)
+    if contact.getContactId():
+      print 'Contact already exists'
+      return False
+    else:
+      new_contact = contact.createNewContact(first_name, last_name)
+      if new_contact['persisted_recipients'][0]:
+        new_contact_id = new_contact['persisted_recipients'][0]['id']
+        if new_contact_id:
+          contact.addContactToList(self.list_id)
+          contact.addFieldsToContact(email, date_fields)
+        else:
+          print 'Error creating contact'      
+      else:
+        print 'Error creating contact'
+
+  def updateContactDateFields(self, email):
+    contact = Contact(email)
+    if contact.getContactId():
+      date_fields = [{}]
+      for email in self.email_series:
+        date_fields[0][email['field']] = self.__get_send_date(email['sent_at_day'])
+      contact.addFieldsToContact(date_fields)
+    else:
+      print 'Contact does not exist'
 
   def __get_send_date(self, sent_at_day):
     today = datetime.today()
     send_date = today + timedelta(days=(sent_at_day+1))
     return send_date.strftime("%m/%d/%y")
-
 
 
 class DripRecipient:
@@ -102,10 +133,9 @@ class DripRecipient:
       exit()
 
 
-
 class Contact:
   def __init__(self, email):
-    self.email = email;
+    self.email = email
 
   def getContactId(self):
     params = {'email': self.email}
@@ -115,13 +145,18 @@ class Contact:
       self.id = body['recipients'][0]['id']
       return self.id
     else:
-      # TO DO => FIX TO GET FIRST AND LAST NAME TOO
-      print 'Contact does not exist. Creating new contact with email: ' + self.email
-      data = [{ "email": self.email }]      
+      print 'ERROR: Contact does not exist'
+      return False
+
+  def createNewContact(self, first_name, last_name):
+      data = [{ 
+        "email": self.email,
+        "first_name": first_name,
+        "last_name": last_name
+      }]
       response = sg.client.contactdb.recipients.post(request_body=data)
       body = json.loads(response.body)
-      self.id = body['persisted_recipients'][0]
-      return self.id
+      return body
 
   def getContactLists(self):
     if self.getContactId():
@@ -131,28 +166,40 @@ class Contact:
       return self.lists
     else:
       print 'Contact does not exist'
-      return []
+      return False
 
   def isContactOnList(self, list_id):
     mkting_lists = self.getContactLists()
-    for mkting_list in mkting_lists:
-      if str(mkting_list['id']) == str(list_id):
-        return True
-    return False
+    if (mkting_lists):
+      for mkting_list in mkting_lists:
+        if str(mkting_list['id']) == str(list_id):
+          return True
+      return False
+    else:
+      print 'Contact does not exist'
+      return 'DNE'
 
   def addContactToList(self, list_id):
     if (self.isContactOnList(list_id) == False):
       response = sg.client.contactdb.lists._(list_id).recipients._(self.id).post()
       print 'Adding contact to list'
       print response.body
+      return True
+    elif (self.isContactOnList(list_id) == 'DNE'):
+      print 'Contact does not exist'
+      return 'DNE'
     else:
       print 'Contact is already on list'
+      return False
 
   def addFieldsToContact(self, data):
     data[0]['email'] = self.email
     response = sg.client.contactdb.recipients.patch(request_body=data)
-    print response.body
-
+    body = json.loads(response.body)
+    if body['updated_count'] == 1:
+      print 'Successfully updated contact'
+    else:
+      print 'Error updating contact'
 
 
 ## Example use of library
@@ -186,5 +233,7 @@ email_series = [
 list_id = "1076254"
 
 WelcomeSeries = DripCampaign(email_series, list_id)
-WelcomeSeries.addRecipientToDrip('devin@sendgrid.com')
-WelcomeSeries.sendDrips()
+WelcomeSeries.addNewContactToDrip('devin.chas123@sendgrid.com')
+# WelcomeSeries.addExistingContactToDrip('devin@sendgrid.com')
+# WelcomeSeries.updateContactDateFields('devin@sendgrid.com')
+# WelcomeSeries.sendDrips()
